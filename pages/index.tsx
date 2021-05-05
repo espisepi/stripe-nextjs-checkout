@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { GetServerSideProps } from "next";
 import { loadStripe } from "@stripe/stripe-js";
 import Stripe from "stripe";
 import { createCheckoutSession } from "next-stripe/client";
+
+//https://github.com/notrab/react-use-cart
+import { CartProvider, useCart } from "react-use-cart";
 
 interface IPrice extends Stripe.Price {
   product: Stripe.Product;
@@ -13,17 +16,93 @@ interface IProps {
 }
 
 interface Product {
-  price: string,
-  quantity: number
+  price: string;
+  quantity: number;
 }
 
-export default function Home({ prices }: IProps) {
+interface Item {
+  id: string;
+  price: number;
+  quantity?: number;
+  img: string;
+}
 
-  const [cart, setCart] = useState< Array<Product> >([]);
-  const buy = async () => {
+function Page( {products} : any ) {
+  const { addItem, inCart } = useCart();
 
+  return (
+    <div>
+      {products.map( p => {
+        const alreadyAdded = inCart(p.id);
+
+        return (
+          <div key={p.id}>
+            <button onClick={() => addItem(p)}>
+              {alreadyAdded ? "Add again" : "Add to Cart"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Cart() {
+  const {
+    isEmpty,
+    cartTotal,
+    totalUniqueItems,
+    items,
+    updateItemQuantity,
+    removeItem,
+    emptyCart
+  } = useCart();
+
+  if (isEmpty) return <p>Your cart is empty</p>;
+
+  return (
+    <>
+      <h1>
+        Cart ({totalUniqueItems} - {cartTotal})
+      </h1>
+
+      hola mundo
+
+      {!isEmpty && <button onClick={emptyCart}>Empty cart</button>}
+
+      <ul>
+        {items.map(item => (
+          <li key={item.id}>
+            {item.quantity} x {item.name}
+            <button
+              onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
+            >
+              -
+            </button>
+            <button
+              onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
+            >
+              +
+            </button>
+            <button onClick={() => removeItem(item.id)}>Remove &times;</button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function Purchase() {
+  const { items, cartTotal } = useCart();
+  const purchase = useCallback( async () => {
+
+    // convert items to stripe product
+    const cartStripe: Array<Product> = items.map( i => ({
+      price: i.id,
+      quantity: i.quantity || 0
+    }));
     // delete all products with quantity <= 0
-    const cartFiltered = cart.filter( p => p.quantity > 0 );
+    const cartFiltered = cartStripe.filter( p => p.quantity > 0 );
 
     if(cartFiltered.length > 0) {
       const session = await createCheckoutSession({
@@ -40,45 +119,34 @@ export default function Home({ prices }: IProps) {
     } else {
       console.log(' El carrito esta vacio ');
     }
-    
-  };
+  },[items]);
+  return(
+    <button onClick={() => purchase()}>Purchase</button>
+  );
+}
 
-  const addCart = (priceId: string) => {
-    const product = cart.find( p => p.price === priceId );
-    if(product){
-      product.quantity++;
-    } else {
-      cart.push({ price: priceId, quantity: 1 });
-    }
-    console.log(cart)
-  }
+export default function Home({ prices }: IProps) {
 
-  const removeCart = (priceId: string) => {
-    const product = cart.find( p => p.price === priceId );
-    if(product && product.quantity > 0){
-      product.quantity--;
-    }
-    console.log(cart);
-  }
-
+  const products: Array<any> = prices.map( p => ( {
+    id: p.id,
+    price: ((p.unit_amount as number) / 100).toFixed(2),
+    quantity: 0,
+    img: p.product.images[0],
+  } ) );
 
   return (
-    <div>
-      <h1>Programmer For Hire</h1>
-
-      <ul>
-        {prices.map((price) => (
-          <li key={price.id}>
-            <h2>{price.product.name}</h2>
-            <img src={price.product.images[0]} />
-            <p>Cost: ${((price.unit_amount as number) / 100).toFixed(2)}</p>
-            <button onClick={() => addCart(price.id)}>Add</button>
-            <button onClick={() => removeCart(price.id)}>Remove</button>
-          </li>
-        ))}
-      </ul>
-      <button onClick={() => buy()}>Buy</button>
-    </div>
+    <>
+      <CartProvider
+        id="jamie"
+        onItemAdd={item => console.log(`Item ${item.id} added!`)}
+        onItemUpdate={item => console.log(`Item ${item.id} updated.!`)}
+        onItemRemove={() => console.log(`Item removed!`)}
+      >
+        <Cart />
+        <Page products={products} />
+        <Purchase />
+      </CartProvider>
+    </>
   );
 }
 
