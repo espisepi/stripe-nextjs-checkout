@@ -40,6 +40,7 @@ function Page( {products} : any ) {
             <button onClick={() => addItem(p)}>
               {alreadyAdded ? "Add again" : "Add to Cart"}
             </button>
+            <img style={{width:'50px', height:'50px'}} src={p.img} />
           </div>
         );
       })}
@@ -85,6 +86,7 @@ function Cart() {
               +
             </button>
             <button onClick={() => removeItem(item.id)}>Remove &times;</button>
+            <img style={{width:'50px', height:'50px'}} src={item.img} />
           </li>
         ))}
       </ul>
